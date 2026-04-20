@@ -1,1 +1,456 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SantéData Cameroun – INF232</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #f5f6f8; --surface: #ffffff; --surface2: #f0f2f5;
+      --border: rgba(0,0,0,0.1); --border2: rgba(0,0,0,0.18);
+      --text: #1a1a1a; --text2: #555; --text3: #888;
+      --green-dark: #085041; --green-mid: #0F6E56;
+      --green-light: #1D9E75; --green-pale: #E1F5EE; --green-muted: #9FE1CB;
+      --radius-sm: 8px; --radius-md: 10px; --radius-lg: 14px;
+    }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
 
+    /* ── HEADER ── */
+    .app-header { background: var(--green-mid); color: var(--green-pale); padding: 0 32px; display: flex; align-items: center; justify-content: space-between; height: 62px; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+    .header-left { display: flex; align-items: center; gap: 14px; }
+    .logo-icon { width: 36px; height: 36px; border-radius: 9px; background: var(--green-light); display: flex; align-items: center; justify-content: center; font-size: 18px; }
+    .app-name { font-size: 17px; font-weight: 600; }
+    .app-sub { font-size: 11px; color: var(--green-muted); margin-top: 1px; }
+    .header-right { display: flex; align-items: center; gap: 10px; }
+    .header-badge { background: rgba(255,255,255,0.15); padding: 5px 12px; border-radius: 99px; font-size: 11px; }
+    .sync-indicator { font-size: 11px; color: var(--green-muted); display: flex; align-items: center; gap: 5px; }
+    .sync-dot { width: 7px; height: 7px; border-radius: 50%; background: #aaa; }
+    .sync-dot.active { background: #4ade80; animation: pulse 1.5s infinite; }
+    .lock-badge { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25); color: white; padding: 5px 12px; border-radius: 99px; font-size: 11px; }
+    .logout-btn { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25); color: white; padding: 5px 12px; border-radius: 99px; font-size: 11px; cursor: pointer; }
+    .logout-btn:hover { background: rgba(255,255,255,0.28); }
+    @keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.4} }
+
+    /* ── TABS ── */
+    .container { max-width: 1080px; margin: 0 auto; padding: 28px 24px; }
+    .tabs { display: flex; gap: 4px; margin-bottom: 24px; border-bottom: 1px solid var(--border); }
+    .tab-btn { padding: 10px 20px; font-size: 13px; font-weight: 500; background: none; border: none; cursor: pointer; color: var(--text2); border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all 0.15s; display: flex; align-items: center; gap: 6px; }
+    .tab-btn.active { color: var(--green-mid); border-bottom-color: var(--green-mid); }
+    .tab-btn:hover:not(.active) { color: var(--text); background: var(--surface2); border-radius: var(--radius-sm) var(--radius-sm) 0 0; }
+    .tab-lock { font-size: 11px; }
+
+    .section { display: none; }
+    .section.active { display: block; }
+
+    /* ── MODAL MOT DE PASSE ── */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.5); backdrop-filter: blur(4px);
+      z-index: 200; align-items: center; justify-content: center;
+    }
+    .modal-overlay.show { display: flex; }
+    .modal-card {
+      background: white; border-radius: 20px; padding: 40px 36px;
+      width: 100%; max-width: 360px; text-align: center;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+      animation: slideUp 0.2s ease;
+    }
+    @keyframes slideUp { from{transform:translateY(20px);opacity:0} to{transform:translateY(0);opacity:1} }
+    .modal-icon { font-size: 40px; margin-bottom: 14px; }
+    .modal-title { font-size: 18px; font-weight: 700; color: var(--green-dark); margin-bottom: 6px; }
+    .modal-sub { font-size: 13px; color: var(--text3); margin-bottom: 24px; line-height: 1.5; }
+    .modal-input { width: 100%; padding: 11px 16px; font-size: 15px; border: 1.5px solid var(--border2); border-radius: var(--radius-md); outline: none; text-align: center; letter-spacing: 2px; font-family: inherit; transition: border-color 0.15s, box-shadow 0.15s; }
+    .modal-input:focus { border-color: var(--green-light); box-shadow: 0 0 0 3px rgba(29,158,117,0.15); }
+    .modal-btn { margin-top: 14px; width: 100%; padding: 12px; font-size: 14px; font-weight: 600; background: var(--green-mid); color: white; border: none; border-radius: var(--radius-md); cursor: pointer; transition: background 0.15s; }
+    .modal-btn:hover { background: var(--green-dark); }
+    .modal-cancel { margin-top: 10px; width: 100%; padding: 10px; font-size: 13px; background: none; border: 1px solid var(--border2); border-radius: var(--radius-md); cursor: pointer; color: var(--text2); }
+    .modal-cancel:hover { background: var(--surface2); }
+    .modal-error { display: none; margin-top: 12px; padding: 9px 12px; background: #fdecea; color: #8b1a1a; border: 1px solid #f5b7b1; border-radius: var(--radius-sm); font-size: 13px; }
+    .modal-error.show { display: block; }
+
+    /* ── FORMULAIRE ── */
+    .form-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 24px 28px; margin-bottom: 20px; }
+    .fieldset-title { font-size: 10.5px; font-weight: 700; color: var(--green-mid); letter-spacing: 0.8px; text-transform: uppercase; margin: 0 0 16px; padding-bottom: 8px; border-bottom: 1.5px solid var(--green-pale); display: flex; align-items: center; gap: 8px; }
+    .fieldset-title::before { content: ''; display: inline-block; width: 4px; height: 14px; background: var(--green-light); border-radius: 2px; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .form-group { display: flex; flex-direction: column; gap: 6px; }
+    .form-group.full { grid-column: 1 / -1; }
+    label { font-size: 12px; color: var(--text2); font-weight: 500; }
+    .required { color: #c0392b; }
+    input[type=text], input[type=number], input[type=date], select, textarea { padding: 9px 12px; font-size: 13px; border: 1px solid var(--border2); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); width: 100%; transition: border-color 0.15s, box-shadow 0.15s; font-family: inherit; }
+    input:focus, select:focus, textarea:focus { outline: none; border-color: var(--green-light); box-shadow: 0 0 0 3px rgba(29,158,117,0.12); }
+    textarea { resize: vertical; min-height: 72px; }
+    .submit-btn { margin-top: 20px; width: 100%; padding: 12px; font-size: 14px; font-weight: 600; background: var(--green-mid); color: white; border: none; border-radius: var(--radius-md); cursor: pointer; transition: background 0.15s; }
+    .submit-btn:hover { background: var(--green-dark); }
+    .submit-btn:disabled { background: #aaa; cursor: not-allowed; }
+    .toast { display: none; margin-top: 14px; padding: 12px 16px; border-radius: var(--radius-md); font-size: 13px; font-weight: 500; align-items: center; gap: 8px; }
+    .toast.show { display: flex; }
+    .toast.success { background: #eafaf4; color: #085041; border: 1px solid #9FE1CB; }
+    .toast.error { background: #fdecea; color: #8b1a1a; border: 1px solid #f5b7b1; }
+
+    /* ── MÉTRIQUES & GRAPHIQUES ── */
+    .metrics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px; }
+    .metric-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px 18px; }
+    .metric-card .m-icon { font-size: 20px; margin-bottom: 8px; }
+    .metric-card .m-label { font-size: 11px; color: var(--text3); margin-bottom: 4px; font-weight: 500; }
+    .metric-card .m-val { font-size: 26px; font-weight: 700; color: var(--text); line-height: 1; }
+    .metric-card .m-sub { font-size: 11px; color: var(--green-light); margin-top: 4px; font-weight: 500; }
+    .chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 18px; }
+    .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 18px 20px; }
+    .chart-card h3 { font-size: 12px; font-weight: 600; color: var(--text2); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.4px; }
+    .legend-row { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-bottom: 10px; }
+    .legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text2); }
+    .legend-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+
+    /* ── TABLEAU ── */
+    .table-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; flex-wrap: wrap; gap: 10px; }
+    .table-title { font-size: 13px; color: var(--text2); }
+    .export-btn { padding: 8px 16px; font-size: 12px; font-weight: 600; border: 1px solid var(--border2); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); cursor: pointer; display: flex; align-items: center; gap: 6px; }
+    .export-btn:hover { background: var(--green-pale); }
+    .table-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { font-size: 10.5px; font-weight: 700; color: var(--text3); text-align: left; padding: 10px 14px; background: var(--surface2); border-bottom: 1px solid var(--border); text-transform: uppercase; white-space: nowrap; }
+    td { padding: 10px 14px; border-bottom: 1px solid var(--border); color: var(--text); }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:hover td { background: #f9fffe; }
+    .pill { display: inline-block; padding: 3px 10px; border-radius: 99px; font-size: 11px; font-weight: 600; }
+    .pill-green { background: #e6f9f2; color: #085041; }
+    .pill-amber { background: #fff5e0; color: #7a4f00; }
+    .pill-red { background: #fdecea; color: #8b1a1a; }
+    .empty-state { text-align: center; padding: 50px 20px; color: var(--text3); font-size: 13px; }
+    .empty-state .empty-icon { font-size: 36px; margin-bottom: 12px; }
+
+    @media (max-width: 700px) {
+      .metrics-grid { grid-template-columns: 1fr 1fr; }
+      .chart-row { grid-template-columns: 1fr; }
+      .form-grid { grid-template-columns: 1fr; }
+      .form-group.full { grid-column: 1; }
+      .container { padding: 18px 14px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── MODAL MOT DE PASSE ── -->
+<div class="modal-overlay" id="pwd-modal">
+  <div class="modal-card">
+    <div class="modal-icon">🔐</div>
+    <div class="modal-title">Accès restreint</div>
+    <div class="modal-sub">Cette section est réservée aux administrateurs.<br>Entrez le mot de passe pour continuer.</div>
+    <input type="password" class="modal-input" id="modal-pwd" placeholder="••••••••" onkeydown="if(event.key==='Enter')checkPwd()">
+    <button class="modal-btn" onclick="checkPwd()">🔓 Déverrouiller</button>
+    <button class="modal-cancel" onclick="cancelPwd()">Annuler</button>
+    <div class="modal-error" id="modal-error">❌ Mot de passe incorrect. Réessayez.</div>
+  </div>
+</div>
+
+<!-- ── APPLICATION ── -->
+<header class="app-header">
+  <div class="header-left">
+    <div class="logo-icon">🏥</div>
+    <div>
+      <div class="app-name">SantéData Cameroun</div>
+      <div class="app-sub">Collecte & analyse descriptive – TP INF232</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="sync-indicator">
+      <div class="sync-dot" id="sync-dot"></div>
+      <span id="sync-label">Connexion...</span>
+    </div>
+    <div class="header-badge">v2.0 · Firebase 🔥</div>
+    <span id="admin-badge" style="display:none;">
+      <button class="logout-btn" onclick="logoutAdmin()">🔒 Verrouiller</button>
+    </span>
+  </div>
+</header>
+
+<div class="container">
+  <div class="tabs">
+    <button class="tab-btn active" id="tab-collect" onclick="switchTab('collect', this)">📋 Collecte de données</button>
+    <button class="tab-btn" id="tab-analyse" onclick="goProtected('analyse', this)">📊 Analyse <span class="tab-lock">🔒</span></button>
+    <button class="tab-btn" id="tab-tableau" onclick="goProtected('tableau', this)">🗃️ Tableau de bord <span class="tab-lock">🔒</span></button>
+  </div>
+
+  <!-- COLLECTE — accès libre -->
+  <div id="sec-collect" class="section active">
+    <div class="form-card">
+      <div class="fieldset-title">Identité du patient</div>
+      <div class="form-grid">
+        <div class="form-group"><label>Nom complet <span class="required">*</span></label><input type="text" id="f-nom" placeholder="Ex : Biyong Jean-Paul"></div>
+        <div class="form-group"><label>Sexe <span class="required">*</span></label><select id="f-sexe"><option value="">-- Sélectionner --</option><option>Masculin</option><option>Féminin</option></select></div>
+        <div class="form-group"><label>Âge (années) <span class="required">*</span></label><input type="number" id="f-age" min="0" max="120" placeholder="Ex : 34"></div>
+        <div class="form-group"><label>Région <span class="required">*</span></label><select id="f-region"><option value="">-- Sélectionner --</option><option>Centre</option><option>Littoral</option><option>Ouest</option><option>Nord</option><option>Adamaoua</option><option>Est</option><option>Sud</option><option>Nord-Ouest</option><option>Sud-Ouest</option><option>Extrême-Nord</option></select></div>
+        <div class="form-group full"><label>Quartier / Village</label><input type="text" id="f-quartier" placeholder="Ex : Bastos, Mokolo, Nkol-Eton..."></div>
+      </div>
+    </div>
+    <div class="form-card">
+      <div class="fieldset-title">Informations médicales</div>
+      <div class="form-grid">
+        <div class="form-group"><label>Date de visite</label><input type="date" id="f-date"></div>
+        <div class="form-group"><label>Type de structure</label><select id="f-structure"><option value="">-- Sélectionner --</option><option>CSI (Centre de Santé Intégré)</option><option>Hôpital de district</option><option>CHU / CHR</option><option>Clinique privée</option><option>Dispensaire</option><option>Pharmacie</option></select></div>
+        <div class="form-group"><label>Pathologie <span class="required">*</span></label><select id="f-patho"><option value="">-- Sélectionner --</option><option>Paludisme</option><option>Hypertension artérielle</option><option>Diabète</option><option>VIH/SIDA</option><option>Tuberculose</option><option>Typhoïde</option><option>COVID-19</option><option>Malnutrition</option><option>Diarrhée / Choléra</option><option>Autre</option></select></div>
+        <div class="form-group"><label>Statut <span class="required">*</span></label><select id="f-statut"><option value="">-- Sélectionner --</option><option>Stable</option><option>Sous traitement</option><option>Critique</option></select></div>
+        <div class="form-group"><label>Poids (kg)</label><input type="number" id="f-poids" min="1" max="300" placeholder="Ex : 68"></div>
+        <div class="form-group"><label>Tension (mmHg)</label><input type="text" id="f-tension" placeholder="Ex : 120/80"></div>
+        <div class="form-group"><label>Température (°C)</label><input type="number" id="f-temp" min="30" max="45" step="0.1" placeholder="Ex : 37.5"></div>
+        <div class="form-group"><label>Niveau d'instruction</label><select id="f-instruction"><option value="">-- Sélectionner --</option><option>Aucun</option><option>Primaire</option><option>Secondaire</option><option>Supérieur</option></select></div>
+        <div class="form-group full"><label>Observations / Notes</label><textarea id="f-notes" placeholder="Symptômes, traitements, antécédents..."></textarea></div>
+      </div>
+      <button class="submit-btn" id="submit-btn" onclick="submitForm()">✔ Enregistrer la fiche patient</button>
+      <div class="toast success" id="toast-ok"><span>✅</span> Fiche enregistrée dans Firebase !</div>
+      <div class="toast error" id="toast-err"><span>❌</span> Erreur. Vérifiez votre connexion.</div>
+    </div>
+  </div>
+
+  <!-- ANALYSE — accès protégé -->
+  <div id="sec-analyse" class="section">
+    <div class="metrics-grid">
+      <div class="metric-card"><div class="m-icon">👥</div><div class="m-label">Patients enregistrés</div><div class="m-val" id="stat-total">–</div><div class="m-sub">total Firebase</div></div>
+      <div class="metric-card"><div class="m-icon">🎂</div><div class="m-label">Âge moyen</div><div class="m-val" id="stat-age">–</div><div class="m-sub">années</div></div>
+      <div class="metric-card"><div class="m-icon">🦠</div><div class="m-label">Pathologie dominante</div><div class="m-val" id="stat-patho" style="font-size:15px;padding-top:5px;">–</div><div class="m-sub" id="stat-patho-n"></div></div>
+      <div class="metric-card"><div class="m-icon">🚨</div><div class="m-label">Taux critique</div><div class="m-val" id="stat-crit">–</div><div class="m-sub">des patients</div></div>
+    </div>
+    <div id="no-data-msg" class="empty-state"><div class="empty-icon">⏳</div><p>Chargement depuis Firebase...</p></div>
+    <div id="charts-area" style="display:none;">
+      <div class="chart-row">
+        <div class="chart-card"><h3>Répartition par pathologie</h3><div class="legend-row" id="leg-patho"></div><div style="position:relative;height:220px;"><canvas id="chart-patho"></canvas></div></div>
+        <div class="chart-card"><h3>Répartition par sexe</h3><div class="legend-row" id="leg-sexe"></div><div style="position:relative;height:220px;"><canvas id="chart-sexe"></canvas></div></div>
+      </div>
+      <div class="chart-row">
+        <div class="chart-card"><h3>Distribution par tranche d'âge</h3><div style="position:relative;height:210px;"><canvas id="chart-age"></canvas></div></div>
+        <div class="chart-card"><h3>Cas par région</h3><div style="position:relative;height:210px;"><canvas id="chart-region"></canvas></div></div>
+      </div>
+      <div class="chart-row">
+        <div class="chart-card"><h3>Statuts de prise en charge</h3><div class="legend-row" id="leg-statut"></div><div style="position:relative;height:200px;"><canvas id="chart-statut"></canvas></div></div>
+        <div class="chart-card"><h3>Évolution des enregistrements</h3><div style="position:relative;height:200px;"><canvas id="chart-time"></canvas></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TABLEAU — accès protégé -->
+  <div id="sec-tableau" class="section">
+    <div class="table-toolbar">
+      <span class="table-title" id="table-count">Chargement...</span>
+      <button class="export-btn" onclick="exportCSV()">⬇ Exporter CSV</button>
+    </div>
+    <div class="table-card">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>#</th><th>Nom</th><th>Âge</th><th>Sexe</th><th>Région</th><th>Pathologie</th><th>Statut</th><th>Poids</th><th>Tension</th><th>Date</th></tr></thead>
+          <tbody id="table-body"><tr><td colspan="10" style="text-align:center;padding:20px;color:#888;">⏳ Chargement...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const MOT_DE_PASSE = "santedata2026";
+  let isAdmin = sessionStorage.getItem('admin') === 'ok';
+  let pendingTab = null;
+  let pendingBtn = null;
+
+  // Mise à jour du badge admin dans le header
+  function updateAdminBadge() {
+    document.getElementById('admin-badge').style.display = isAdmin ? 'inline' : 'none';
+    // Mettre à jour les icônes des onglets
+    document.getElementById('tab-analyse').innerHTML = '📊 Analyse ' + (isAdmin ? '<span class="tab-lock">🔓</span>' : '<span class="tab-lock">🔒</span>');
+    document.getElementById('tab-tableau').innerHTML = '🗃️ Tableau de bord ' + (isAdmin ? '<span class="tab-lock">🔓</span>' : '<span class="tab-lock">🔒</span>');
+  }
+  updateAdminBadge();
+
+  function goProtected(tab, btn) {
+    if (isAdmin) {
+      switchTab(tab, btn);
+    } else {
+      pendingTab = tab;
+      pendingBtn = btn;
+      document.getElementById('modal-pwd').value = '';
+      document.getElementById('modal-error').classList.remove('show');
+      document.getElementById('pwd-modal').classList.add('show');
+      setTimeout(() => document.getElementById('modal-pwd').focus(), 100);
+    }
+  }
+
+  function checkPwd() {
+    const val = document.getElementById('modal-pwd').value;
+    if (val === MOT_DE_PASSE) {
+      isAdmin = true;
+      sessionStorage.setItem('admin', 'ok');
+      document.getElementById('pwd-modal').classList.remove('show');
+      document.getElementById('modal-error').classList.remove('show');
+      updateAdminBadge();
+      if (pendingTab) switchTab(pendingTab, pendingBtn);
+    } else {
+      document.getElementById('modal-error').classList.add('show');
+      document.getElementById('modal-pwd').value = '';
+      document.getElementById('modal-pwd').focus();
+    }
+  }
+
+  function cancelPwd() {
+    document.getElementById('pwd-modal').classList.remove('show');
+    document.getElementById('modal-error').classList.remove('show');
+    pendingTab = null; pendingBtn = null;
+  }
+
+  function logoutAdmin() {
+    isAdmin = false;
+    sessionStorage.removeItem('admin');
+    updateAdminBadge();
+    // Revenir à la collecte
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    document.getElementById('tab-collect').classList.add('active');
+    document.getElementById('sec-collect').classList.add('active');
+  }
+
+  window.switchTab = function(t, btn) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('sec-' + t).classList.add('active');
+    if (t === 'analyse') renderAnalyse();
+    if (t === 'tableau') renderTable();
+  };
+</script>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, serverTimestamp }
+    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyAAeluXUy8pAY3Bqx49whb8TJP297UP7Zk",
+    authDomain: "santedata-cameroun.firebaseapp.com",
+    projectId: "santedata-cameroun",
+    storageBucket: "santedata-cameroun.firebasestorage.app",
+    messagingSenderId: "807060118135",
+    appId: "1:807060118135:web:75a2b8d65e4c7ae585c472"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+  const patientsCol = collection(db, "patients");
+
+  let allPatients = [];
+  let chartPatho, chartSexe, chartAge, chartRegion, chartStatut, chartTime;
+
+  const C_PATHO  = ['#1D9E75','#378ADD','#D85A30','#BA7517','#A32D2D','#534AB7','#D4537E','#639922','#5F5E5A','#0F6E56'];
+  const C_SEXE   = ['#378ADD','#D4537E'];
+  const C_AGE    = ['#9FE1CB','#5DCAA5','#1D9E75','#0F6E56','#085041'];
+  const C_REGION = ['#AFA9EC','#7F77DD','#534AB7','#3C3489','#26215C','#B5D4F4','#85B7EB','#378ADD','#9FE1CB','#1D9E75'];
+  const C_STATUT = ['#1D9E75','#BA7517','#A32D2D'];
+
+  const q = query(patientsCol, orderBy("createdAt", "desc"));
+  onSnapshot(q, (snapshot) => {
+    allPatients = snapshot.docs.map(doc => ({ ...doc.data() }));
+    document.getElementById('sync-dot').classList.add('active');
+    document.getElementById('sync-label').textContent = 'Synchronisé 🔥';
+    const active = document.querySelector('.section.active');
+    if (active && active.id === 'sec-analyse') renderAnalyse();
+    if (active && active.id === 'sec-tableau') renderTable();
+  }, () => { document.getElementById('sync-label').textContent = 'Hors ligne'; });
+
+  window.submitForm = async function() {
+    const g = id => document.getElementById(id).value.trim();
+    const nom=g('f-nom'), sexe=g('f-sexe'), age=g('f-age'), region=g('f-region'), patho=g('f-patho'), statut=g('f-statut');
+    if (!nom||!sexe||!age||!region||!patho||!statut) { alert('⚠️ Champs obligatoires manquants.'); return; }
+    const btn = document.getElementById('submit-btn');
+    btn.disabled=true; btn.textContent='Enregistrement...';
+    try {
+      await addDoc(patientsCol, {
+        nom, sexe, age:parseInt(age), region,
+        quartier:g('f-quartier')||'–', structure:g('f-structure')||'–',
+        patho, statut, poids:g('f-poids')||'–', tension:g('f-tension')||'–',
+        temperature:g('f-temp')||'–', instruction:g('f-instruction')||'–',
+        notes:g('f-notes'), date:g('f-date')||new Date().toISOString().slice(0,10),
+        createdAt:serverTimestamp()
+      });
+      ['f-nom','f-age','f-quartier','f-poids','f-tension','f-temp','f-notes'].forEach(id=>document.getElementById(id).value='');
+      ['f-sexe','f-region','f-structure','f-patho','f-statut','f-instruction'].forEach(id=>document.getElementById(id).value='');
+      document.getElementById('f-date').value=new Date().toISOString().slice(0,10);
+      showToast('toast-ok');
+    } catch(e) { console.error(e); showToast('toast-err'); }
+    btn.disabled=false; btn.textContent='✔ Enregistrer la fiche patient';
+  };
+
+  function showToast(id){const t=document.getElementById(id);t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3000);}
+
+  window.renderTable = function() {
+    const n=allPatients.length;
+    document.getElementById('table-count').textContent=n+' patient(s) – Firebase 🔥';
+    const tbody=document.getElementById('table-body');
+    if(!n){tbody.innerHTML='<tr><td colspan="10"><div class="empty-state"><div class="empty-icon">🗂️</div><p>Aucune donnée.</p></div></td></tr>';return;}
+    tbody.innerHTML=allPatients.map((p,i)=>{
+      const pc=p.statut==='Stable'?'pill-green':p.statut==='Critique'?'pill-red':'pill-amber';
+      return `<tr><td>${n-i}</td><td>${p.nom}</td><td>${p.age}</td><td>${p.sexe}</td><td>${p.region}</td><td>${p.patho}</td><td><span class="pill ${pc}">${p.statut}</span></td><td>${p.poids}</td><td>${p.tension}</td><td>${p.date}</td></tr>`;
+    }).join('');
+  };
+
+  window.renderAnalyse = function() {
+    const pts=allPatients,n=pts.length;
+    document.getElementById('no-data-msg').style.display=n?'none':'block';
+    document.getElementById('charts-area').style.display=n?'block':'none';
+    if(!n){document.getElementById('no-data-msg').querySelector('p').textContent='Aucune donnée collectée.';return;}
+    document.getElementById('stat-total').textContent=n;
+    const ages=pts.map(p=>p.age).filter(Boolean);
+    document.getElementById('stat-age').textContent=ages.length?Math.round(ages.reduce((a,b)=>a+b,0)/ages.length):'–';
+    const pathoCounts=count(pts,'patho');
+    const top=Object.entries(pathoCounts).sort((a,b)=>b[1]-a[1])[0];
+    document.getElementById('stat-patho').textContent=top?top[0]:'–';
+    document.getElementById('stat-patho-n').textContent=top?top[1]+' cas':'';
+    document.getElementById('stat-crit').textContent=Math.round(pts.filter(p=>p.statut==='Critique').length/n*100)+'%';
+
+    const pL=Object.keys(pathoCounts);
+    makeLegend('leg-patho',pL,C_PATHO,pathoCounts);
+    destroyChart(chartPatho);
+    chartPatho=new Chart(document.getElementById('chart-patho'),{type:'doughnut',data:{labels:pL,datasets:[{data:pL.map(l=>pathoCounts[l]),backgroundColor:C_PATHO,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}}});
+
+    const sC=count(pts,'sexe'),sL=Object.keys(sC);
+    makeLegend('leg-sexe',sL,C_SEXE,sC);
+    destroyChart(chartSexe);
+    chartSexe=new Chart(document.getElementById('chart-sexe'),{type:'pie',data:{labels:sL,datasets:[{data:sL.map(l=>sC[l]),backgroundColor:C_SEXE,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}}});
+
+    const tr=['0–14','15–29','30–44','45–59','60+'],ab=[0,0,0,0,0];
+    pts.forEach(p=>{const a=p.age;if(a<15)ab[0]++;else if(a<30)ab[1]++;else if(a<45)ab[2]++;else if(a<60)ab[3]++;else ab[4]++;});
+    destroyChart(chartAge);
+    chartAge=new Chart(document.getElementById('chart-age'),{type:'bar',data:{labels:tr,datasets:[{data:ab,backgroundColor:C_AGE,borderWidth:0,borderRadius:5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{font:{size:11}}},y:{beginAtZero:true,ticks:{font:{size:11},stepSize:1}}}}});
+
+    const rC=count(pts,'region'),rL=Object.keys(rC).sort((a,b)=>rC[b]-rC[a]);
+    destroyChart(chartRegion);
+    chartRegion=new Chart(document.getElementById('chart-region'),{type:'bar',data:{labels:rL,datasets:[{data:rL.map(l=>rC[l]),backgroundColor:C_REGION,borderWidth:0,borderRadius:5}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{font:{size:11},stepSize:1}},y:{ticks:{font:{size:11}}}}}});
+
+    const stC=count(pts,'statut'),stL=['Stable','Sous traitement','Critique'].filter(l=>stC[l]);
+    makeLegend('leg-statut',stL,C_STATUT,stC);
+    destroyChart(chartStatut);
+    chartStatut=new Chart(document.getElementById('chart-statut'),{type:'doughnut',data:{labels:stL,datasets:[{data:stL.map(l=>stC[l]||0),backgroundColor:C_STATUT,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}}});
+
+    const dC=count(pts,'date'),dL=Object.keys(dC).sort();
+    destroyChart(chartTime);
+    chartTime=new Chart(document.getElementById('chart-time'),{type:'line',data:{labels:dL,datasets:[{data:dL.map(d=>dC[d]),borderColor:'#1D9E75',backgroundColor:'rgba(29,158,117,0.10)',fill:true,tension:0.4,pointRadius:4,pointBackgroundColor:'#1D9E75',borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{font:{size:10}}},y:{beginAtZero:true,ticks:{font:{size:11},stepSize:1}}}}});
+  };
+
+  function count(arr,key){return arr.reduce((a,p)=>{a[p[key]]=(a[p[key]]||0)+1;return a;},{});}
+  function makeLegend(id,labels,colors,counts){document.getElementById(id).innerHTML=labels.map((l,i)=>`<span class="legend-item"><span class="legend-dot" style="background:${colors[i%colors.length]}"></span>${l}: ${counts[l]}</span>`).join('');}
+  function destroyChart(ref){if(ref){try{ref.destroy();}catch(e){}}}
+
+  window.exportCSV=function(){
+    if(!allPatients.length){alert('Aucune donnée.');return;}
+    const h=['#','Nom','Age','Sexe','Region','Quartier','Structure','Pathologie','Statut','Poids','Tension','Temp','Instruction','Date'];
+    const rows=allPatients.map((p,i)=>[allPatients.length-i,`"${p.nom}"`,p.age,p.sexe,p.region,`"${p.quartier}"`,`"${p.structure}"`,p.patho,p.statut,p.poids,p.tension,p.temperature,p.instruction,p.date]);
+    const csv=[h.join(','),...rows.map(r=>r.join(','))].join('\n');
+    const a=document.createElement('a');
+    a.href='data:text/csv;charset=utf-8,'+encodeURIComponent('\uFEFF'+csv);
+    a.download='santedata_'+new Date().toISOString().slice(0,10)+'.csv';
+    a.click();
+  };
+
+  document.getElementById('f-date').value=new Date().toISOString().slice(0,10);
+</script>
+</body>
+</html>
